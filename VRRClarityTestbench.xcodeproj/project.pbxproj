@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		E706F2352BDC65B900287A60 /* DummyMetalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E706F2342BDC65B900287A60 /* DummyMetalRenderer.swift */; };
-		E706F2392BE16FD100287A60 /* badapple.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = E706F2382BE16FD100287A60 /* badapple.mp4 */; };
 		E70FAAC62BEF0A11004E7D98 /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black_2x.png in Resources */ = {isa = PBXBuildFile; fileRef = E70FAAC52BEF0A11004E7D98 /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black_2x.png */; };
 		E72683E02BEEBE940065B78B /* One-Pixel-Checkerboard-2024-001-copy.png in Resources */ = {isa = PBXBuildFile; fileRef = E72683DC2BEEBE940065B78B /* One-Pixel-Checkerboard-2024-001-copy.png */; };
 		E72683E12BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png in Resources */ = {isa = PBXBuildFile; fileRef = E72683DD2BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png */; };
@@ -27,7 +26,6 @@
 
 /* Begin PBXFileReference section */
 		E706F2342BDC65B900287A60 /* DummyMetalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DummyMetalRenderer.swift; sourceTree = "<group>"; };
-		E706F2382BE16FD100287A60 /* badapple.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = badapple.mp4; sourceTree = "<group>"; };
 		E70FAAC52BEF0A11004E7D98 /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black_2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "857a4-2020-kgontech-1920x1080-tuff-test-white-on-black_2x.png"; sourceTree = "<group>"; };
 		E72683DC2BEEBE940065B78B /* One-Pixel-Checkerboard-2024-001-copy.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "One-Pixel-Checkerboard-2024-001-copy.png"; sourceTree = "<group>"; };
 		E72683DD2BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png"; sourceTree = "<group>"; };
@@ -83,7 +81,6 @@
 				E72683DE2BEEBE940065B78B /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png */,
 				E72683DF2BEEBE940065B78B /* 89002-2018-interlace-non-res-chart-1080p.png */,
 				E72683DC2BEEBE940065B78B /* One-Pixel-Checkerboard-2024-001-copy.png */,
-				E706F2382BE16FD100287A60 /* badapple.mp4 */,
 				E7F627542BDA261700ABE83B /* SBSMaterial.usda */,
 				E7F6273B2BD9D3B300ABE83B /* VRRClarityTestbenchApp.swift */,
 				E7F6273D2BD9D3B300ABE83B /* ContentView.swift */,
@@ -176,7 +173,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E70FAAC62BEF0A11004E7D98 /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black_2x.png in Resources */,
-				E706F2392BE16FD100287A60 /* badapple.mp4 in Resources */,
 				E7F627442BD9D3B400ABE83B /* Assets.xcassets in Resources */,
 				E72683E32BEEBE940065B78B /* 89002-2018-interlace-non-res-chart-1080p.png in Resources */,
 				E72683E22BEEBE940065B78B /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png in Resources */,
@@ -346,7 +342,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "VRRClarityTestbench/VRRClarityTestbench-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 			};
@@ -373,7 +368,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "VRRClarityTestbench/VRRClarityTestbench-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 			};

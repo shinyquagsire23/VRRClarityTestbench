@@ -15,12 +15,12 @@ import AVFoundation
 import SceneKit
 
 // Render to the full headset FOV
-let fullFOVRender = false
+let fullFOVRender = true
 
 // Render texture params
 let renderWidth = Int(1920)
 let renderHeight = Int(fullFOVRender ? 1840 : 1080) // 1840 for full screen
-let renderScale = fullFOVRender ? 2.5 : 1.0
+let renderScale = fullFOVRender ? 3.0 : 1.0
 
 //
 // Test suite parameters
@@ -60,8 +60,6 @@ let widthRatio = Float(renderWidth) / diagonalAspectRatio
 let virtualScreenWidth: Float = widthRatio * virtualScreenDiagonal // 62cm, or 24.4in
 let virtualScreenHeight: Float = heightRatio * virtualScreenDiagonal // 34.9cm, or 13.7in
 
-let alignedUniformsSize = (MemoryLayout<Uniforms>.size + 0xFF) & -0x100
-let alignedPlaneUniformSize = (MemoryLayout<PlaneUniform>.size + 0xFF) & -0x100
 let maxBuffersInFlight = 3
 let maxPlanesDrawn = 1024
 let renderFormat = MTLPixelFormat.bgra8Unorm // rgba8Unorm, rgba8Unorm_srgb, bgra8Unorm, bgra8Unorm_srgb, rgba16Float
