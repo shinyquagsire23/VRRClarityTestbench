@@ -20,7 +20,7 @@ let fullFOVRender = false
 // Render texture params
 let renderWidth = Int(1920)
 let renderHeight = Int(fullFOVRender ? 1824 : 1080) // 1840 for full screen
-let renderScale = fullFOVRender ? 3.0 : 1.0
+let renderScale = fullFOVRender ? 2.5 : 1.0
 
 //
 // Test suite parameters
