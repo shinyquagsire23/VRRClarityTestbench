@@ -15,11 +15,11 @@ import AVFoundation
 import SceneKit
 
 // Render to the full headset FOV
-let fullFOVRender = true
+let fullFOVRender = false
 
 // Render texture params
 let renderWidth = Int(1920)
-let renderHeight = Int(fullFOVRender ? 1840 : 1080) // 1840 for full screen
+let renderHeight = Int(fullFOVRender ? 1824 : 1080) // 1840 for full screen
 let renderScale = fullFOVRender ? 3.0 : 1.0
 
 //
