@@ -18,15 +18,18 @@ import SceneKit
 let fullFOVRender = false
 
 // Render texture params
-let renderWidth = Int(1920)
-let renderHeight = Int(fullFOVRender ? 1824 : 1080) // 1840 for full screen
+let renderWidth = Int(fullFOVRender ? 1920+298 : 1920) // left/right eye are spaced 256px x 80px apart, so we adjust for that.
+let renderHeight = Int(fullFOVRender ? 1824+84 : 1080) // 1824 for full screen
 let renderScale = fullFOVRender ? 2.5 : 1.0
 
 //
 // Test suite parameters
 // -----------------------------------------------------------------
-// Headlock the test image including pitch/roll
+// Headlock the test image including pitch/roll. If false, only headlock yaw.
 let headlockTestImage = false
+
+// Just place the image in the world, no headlocking
+let imageDoesntFollowHeadAtAll = false
 
 // Display different mipmap levels (below 1x) with a yellow -> orange -> red gradient
 let colorMipLevels = true
@@ -36,6 +39,9 @@ let onlyColorsNoTestImage = false
 
 // Test the test texture without mipmaps on, if false
 let enableDrawableMipmaps = true
+
+// How to filter the image when it is drawn by RealityKit
+let imageFilteringMethod = ImageFilteringMethod.bicubic
 
 // Virtual screen size/depth
 let virtualScreenDepth: Float = 30.0 * inchesToMeters // 30in away
@@ -62,10 +68,16 @@ let virtualScreenHeight: Float = heightRatio * virtualScreenDiagonal // 34.9cm, 
 
 let maxBuffersInFlight = 3
 let maxPlanesDrawn = 1024
-let renderFormat = MTLPixelFormat.bgra8Unorm // rgba8Unorm, rgba8Unorm_srgb, bgra8Unorm, bgra8Unorm_srgb, rgba16Float
+let renderFormat = MTLPixelFormat.bgra8Unorm_srgb // rgba8Unorm, rgba8Unorm_srgb, bgra8Unorm, bgra8Unorm_srgb, rgba16Float
 let renderZNear = 0.001
 let renderZFar = 100.0
 let inchesToMeters: Float = 25.4 / 1000.0
+
+enum ImageFilteringMethod {
+    case nearest
+    case bilinear
+    case bicubic
+}
 
 class VisionPro: NSObject, ObservableObject {
     let arSession = ARKitSession()
@@ -189,7 +201,7 @@ class ImmersiveSystem : System {
         self.device = MTLCreateSystemDefaultDevice()!
         self.commandQueue = self.device.makeCommandQueue()!
         
-        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead, .shaderWrite], mipmapsMode: enableDrawableMipmaps ? .allocateAll : .none)
+        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapsMode: enableDrawableMipmaps ? .allocateAll : .none)
         self.drawableQueue = try? TextureResource.DrawableQueue(desc)
         self.drawableQueue!.allowsNextDrawableTimeout = true
         
@@ -211,8 +223,16 @@ class ImmersiveSystem : System {
             await visionPro.runArkitSession()
         }
         Task {
+            var materialName = switch imageFilteringMethod {
+                case .nearest:
+                    "/Root/MonoMaterialNearest"
+                case .bilinear:
+                    "/Root/MonoMaterialBilinear"
+                case .bicubic:
+                    "/Root/MonoMaterialBicubic"
+            }
             self.surfaceMaterial = try! await ShaderGraphMaterial(
-                named: "/Root/MonoMaterial",
+                named: materialName,
                 from: "SBSMaterial.usda"
             )
             try! self.surfaceMaterial!.setParameter(
@@ -312,7 +332,7 @@ class ImmersiveSystem : System {
     }
     
     func createTextureWithColor(color: MTLClearColor, size: CGSize) -> MTLTexture? {
-        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm,
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm_srgb,
                                                                          width: Int(size.width),
                                                                          height: Int(size.height),
                                                                          mipmapped: false)
@@ -432,9 +452,18 @@ class ImmersiveSystem : System {
                 }
             }
             
-            plane.position = position
-            plane.orientation = orientation
-            plane.scale = scale
+            if imageDoesntFollowHeadAtAll {
+                plane.position = simd_float3(0.0, 1.0, -1.0)
+                plane.orientation = simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
+                plane.scale = scale
+            }
+            else {
+                plane.position = position
+                plane.orientation = orientation
+                plane.scale = scale
+            }
+            
+            
             
             //commandBuffer.present(drawable)
             commandBuffer.commit()
