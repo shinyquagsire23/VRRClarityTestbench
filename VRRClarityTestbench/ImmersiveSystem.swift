@@ -18,7 +18,7 @@ import SceneKit
 let fullFOVRender = false
 
 // Render texture params
-let renderWidth = Int(fullFOVRender ? 1920+298 : 1920) // left/right eye are spaced 256px x 80px apart, so we adjust for that.
+let renderWidth = Int(fullFOVRender ? 1888+293 : 1920) // left/right eye are spaced 256px x 80px apart, so we adjust for that.
 let renderHeight = Int(fullFOVRender ? 1824+84 : 1080) // 1824 for full screen
 let renderScale = fullFOVRender ? 2.5 : 1.0
 
@@ -295,6 +295,9 @@ class ImmersiveSystem : System {
             //planeTransform.columns.3 += DummyMetalRenderer.renderViewTransforms[0].columns.3
             
             do {
+                if let surfaceMaterial = surfaceMaterial {
+                    plane.model?.materials = [surfaceMaterial]
+                }
                 
                 let drawable = try drawableQueue?.nextDrawable()
                 if drawable == nil {
@@ -317,10 +320,6 @@ class ImmersiveSystem : System {
                 
                 //print(String(format: "%.2f, %.2f, %.2f", planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z), CACurrentMediaTime() - lastUpdateTime)
                 lastUpdateTime = CACurrentMediaTime()
-                
-                if let surfaceMaterial = surfaceMaterial {
-                    plane.model?.materials = [surfaceMaterial]
-                }
                 
                 drawNextTexture(drawable: drawable!, simdDeviceAnchor: transform, plane: plane, position: position, orientation: orientation, scale: scale)
                 drawable!.presentOnSceneUpdate()
