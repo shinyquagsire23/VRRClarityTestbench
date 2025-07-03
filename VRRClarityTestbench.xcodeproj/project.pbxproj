@@ -13,6 +13,7 @@
 		E72683E12BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png in Resources */ = {isa = PBXBuildFile; fileRef = E72683DD2BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png */; };
 		E72683E22BEEBE940065B78B /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png in Resources */ = {isa = PBXBuildFile; fileRef = E72683DE2BEEBE940065B78B /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png */; };
 		E72683E32BEEBE940065B78B /* 89002-2018-interlace-non-res-chart-1080p.png in Resources */ = {isa = PBXBuildFile; fileRef = E72683DF2BEEBE940065B78B /* 89002-2018-interlace-non-res-chart-1080p.png */; };
+		E7D2220F2E1727840080F209 /* GlobalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D2220E2E1727840080F209 /* GlobalSettings.swift */; };
 		E7F6273A2BD9D3B300ABE83B /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = E7F627392BD9D3B300ABE83B /* RealityKitContent */; };
 		E7F6273C2BD9D3B300ABE83B /* VRRClarityTestbenchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F6273B2BD9D3B300ABE83B /* VRRClarityTestbenchApp.swift */; };
 		E7F6273E2BD9D3B300ABE83B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F6273D2BD9D3B300ABE83B /* ContentView.swift */; };
@@ -31,6 +32,7 @@
 		E72683DD2BEEBE940065B78B /* 0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "0b32a-2020-kgontech-1920x1080-tuff-test-black-on-white.png"; sourceTree = "<group>"; };
 		E72683DE2BEEBE940065B78B /* 857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "857a4-2020-kgontech-1920x1080-tuff-test-white-on-black.png"; sourceTree = "<group>"; };
 		E72683DF2BEEBE940065B78B /* 89002-2018-interlace-non-res-chart-1080p.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "89002-2018-interlace-non-res-chart-1080p.png"; sourceTree = "<group>"; };
+		E7D2220E2E1727840080F209 /* GlobalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSettings.swift; sourceTree = "<group>"; };
 		E7F627342BD9D3B300ABE83B /* VRRClarityTestbench.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VRRClarityTestbench.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7F627382BD9D3B300ABE83B /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		E7F6273B2BD9D3B300ABE83B /* VRRClarityTestbenchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VRRClarityTestbenchApp.swift; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@
 				E7F627542BDA261700ABE83B /* SBSMaterial.usda */,
 				E7F6273B2BD9D3B300ABE83B /* VRRClarityTestbenchApp.swift */,
 				E7F6273D2BD9D3B300ABE83B /* ContentView.swift */,
+				E7D2220E2E1727840080F209 /* GlobalSettings.swift */,
 				E7F6273F2BD9D3B300ABE83B /* ImmersiveView.swift */,
 				E7F6274E2BD9D7C000ABE83B /* ImmersiveSystem.swift */,
 				E706F2342BDC65B900287A60 /* DummyMetalRenderer.swift */,
@@ -196,6 +199,7 @@
 				E7F6274F2BD9D7C000ABE83B /* ImmersiveSystem.swift in Sources */,
 				E7F627402BD9D3B300ABE83B /* ImmersiveView.swift in Sources */,
 				E706F2352BDC65B900287A60 /* DummyMetalRenderer.swift in Sources */,
+				E7D2220F2E1727840080F209 /* GlobalSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

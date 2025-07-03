@@ -27,10 +27,51 @@ struct ContentStageConfiguration: CompositorLayerConfiguration {
 
 @main
 struct VRRClarityTestbenchApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    static var gStore = GlobalSettingsStore()
+    
+    static func saveSettings() {
+        do {
+            try VRRClarityTestbenchApp.gStore.save(settings: VRRClarityTestbenchApp.gStore.settings)
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
+    
+    static func loadSettings() {
+        do {
+            try VRRClarityTestbenchApp.gStore.load()
+        } catch {
+            fatalError(error.localizedDescription)
+        }
+    }
+    
     var body: some Scene {
         WindowGroup(id: "Entry") {
             ContentView()
+            .task {
+                VRRClarityTestbenchApp.loadSettings()
+            }
+            .onChange(of: scenePhase) {
+                switch scenePhase {
+                case .background:
+                    VRRClarityTestbenchApp.saveSettings()
+                    break
+                case .inactive:
+                    VRRClarityTestbenchApp.saveSettings()
+                    break
+                case .active:
+                    VRRClarityTestbenchApp.loadSettings()
+                    break
+                @unknown default:
+                    break
+                }
+            }
+            .environmentObject(VRRClarityTestbenchApp.gStore)
+            .fixedSize()
         }
+        .windowStyle(.plain)
+        .windowResizability(.contentSize)
         
         ImmersiveSpace(id: "DummyImmersiveSpace") {
             CompositorLayer(configuration: ContentStageConfiguration()) { layerRenderer in

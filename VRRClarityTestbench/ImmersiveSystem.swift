@@ -22,33 +22,6 @@ let renderWidth = Int(fullFOVRender ? 1920+298 : 1920) // left/right eye are spa
 let renderHeight = Int(fullFOVRender ? 1824+84 : 1080) // 1824 for full screen
 let renderScale = fullFOVRender ? 2.5 : 1.0
 
-//
-// Test suite parameters
-// -----------------------------------------------------------------
-// Headlock the test image including pitch/roll. If false, only headlock yaw.
-let headlockTestImage = false
-
-// Just place the image in the world, no headlocking
-let imageDoesntFollowHeadAtAll = false
-
-// Display different mipmap levels (below 1x) with a yellow -> orange -> red gradient
-let colorMipLevels = true
-
-// Level 0/1x shows as solid green, not a test image
-let onlyColorsNoTestImage = false
-
-// Test the test texture without mipmaps on, if false
-let enableDrawableMipmaps = true
-
-// How to filter the image when it is drawn by RealityKit
-let imageFilteringMethod = ImageFilteringMethod.bicubic
-
-// Virtual screen size/depth
-let virtualScreenDepth: Float = 30.0 * inchesToMeters // 30in away
-let virtualScreenDiagonal: Float = 28.0 * inchesToMeters
-
-let colorMipmapLevelStart: Int = 1 // set to 2 for 4k textures, or to view the texture fully.
-
 let testImageFilename = "857a4-2020-kgontech-1920x1080-tuff-test-white-on-black"
 //let testImageFilename = "One-Pixel-Checkerboard-2024-001-copy"
 
@@ -63,8 +36,6 @@ let testImageFilename = "857a4-2020-kgontech-1920x1080-tuff-test-white-on-black"
 let diagonalAspectRatio = sqrt(pow(Float(renderWidth), 2) + pow(Float(renderHeight), 2))
 let heightRatio = Float(renderHeight) / diagonalAspectRatio
 let widthRatio = Float(renderWidth) / diagonalAspectRatio
-let virtualScreenWidth: Float = widthRatio * virtualScreenDiagonal // 62cm, or 24.4in
-let virtualScreenHeight: Float = heightRatio * virtualScreenDiagonal // 34.9cm, or 13.7in
 
 let maxBuffersInFlight = 3
 let maxPlanesDrawn = 1024
@@ -203,7 +174,7 @@ class DrawableWrapper {
             return
         }
 
-        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: pixelFormat, width: width, height: height, usage: [usage], mipmapsMode: enableDrawableMipmaps ? .allocateAll : .none)
+        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: pixelFormat, width: width, height: height, usage: [usage], mipmapsMode: VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps ? .allocateAll : .none)
         let queue = try? TextureResource.DrawableQueue(desc)
         queue!.allowsNextDrawableTimeout = true
         self.wrapped = queue
@@ -283,7 +254,9 @@ class ImmersiveSystem : System {
     let visionPro = VisionPro()
     var lastUpdateTime = 0.0
     var drawableQueue: DrawableWrapper? = nil
-    private(set) var surfaceMaterial: ShaderGraphMaterial? = nil
+    private(set) var surfaceMaterialNearest: ShaderGraphMaterial? = nil
+    private(set) var surfaceMaterialBilinear: ShaderGraphMaterial? = nil
+    private(set) var surfaceMaterialBicubic: ShaderGraphMaterial? = nil
     private var textureResource: TextureResource?
     
     public let device: MTLDevice
@@ -297,13 +270,15 @@ class ImmersiveSystem : System {
     var mipColorTextures = [MTLTexture]()
     var testImageTexture: MTLTexture
     var lastFrameFetch: Double = 0.0
+    var lastEnableDrawableMipmaps = false
     
     required init(scene: RealityKit.Scene) {
         //visionPro.createDisplayLink()
         self.device = MTLCreateSystemDefaultDevice()!
         self.commandQueue = self.device.makeCommandQueue()!
         
-        self.drawableQueue = DrawableWrapper(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapLevelCount: 10)
+        self.lastEnableDrawableMipmaps = VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps
+        self.drawableQueue = DrawableWrapper(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapLevelCount: VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps ? 10 : 1)
         
         let textureLoader = MTKTextureLoader(device: device)
         testImageTexture = try! textureLoader.newTexture(URL: Bundle.main.url(forResource: testImageFilename, withExtension: "png")!, options: [.generateMipmaps: true])
@@ -323,20 +298,28 @@ class ImmersiveSystem : System {
             await visionPro.runArkitSession()
         }
         Task {
-            let materialName = switch imageFilteringMethod {
-                case .nearest:
-                    "/Root/MonoMaterialNearest"
-                case .bilinear:
-                    "/Root/MonoMaterialBilinear"
-                case .bicubic:
-                    "/Root/MonoMaterialBicubic"
-            }
-            self.surfaceMaterial = try! await ShaderGraphMaterial(
-                named: materialName,
+            self.surfaceMaterialNearest = try! await ShaderGraphMaterial(
+                named: "/Root/MonoMaterialNearest",
+                from: "SBSMaterial.usda"
+            )
+            self.surfaceMaterialBilinear = try! await ShaderGraphMaterial(
+                named: "/Root/MonoMaterialBilinear",
+                from: "SBSMaterial.usda"
+            )
+            self.surfaceMaterialBicubic = try! await ShaderGraphMaterial(
+                named: "/Root/MonoMaterialBicubic",
                 from: "SBSMaterial.usda"
             )
             self.textureResource = self.drawableQueue!.makeTextureResource()
-            try! self.surfaceMaterial!.setParameter(
+            try! self.surfaceMaterialNearest!.setParameter(
+                name: "texture",
+                value: .textureResource(self.textureResource!)
+            )
+            try! self.surfaceMaterialBilinear!.setParameter(
+                name: "texture",
+                value: .textureResource(self.textureResource!)
+            )
+            try! self.surfaceMaterialBicubic!.setParameter(
                 name: "texture",
                 value: .textureResource(self.textureResource!)
             )
@@ -387,15 +370,40 @@ class ImmersiveSystem : System {
             
             var planeTransform = transform
             //planeTransform *= renderViewTransforms[0]
-            if headlockTestImage || fullFOVRender {
-                planeTransform.columns.3 -= transform.columns.2 * virtualScreenDepth
+            if VRRClarityTestbenchApp.gStore.settings.headlockTestImage || fullFOVRender {
+                planeTransform.columns.3 -= transform.columns.2 * VRRClarityTestbenchApp.gStore.settings.virtualScreenDepth * inchesToMeters
             }
             //planeTransform.columns.3 += transform.columns.0 * 0.5
             
             //planeTransform.columns.3 += DummyMetalRenderer.renderViewTransforms[0].columns.3
             
-            if let surfaceMaterial = surfaceMaterial {
-                plane.model?.materials = [surfaceMaterial]
+            if self.lastEnableDrawableMipmaps != VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps {
+                self.drawableQueue = DrawableWrapper(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapLevelCount: VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps ? 10 : 1)
+                self.textureResource = self.drawableQueue!.makeTextureResource()
+                try! self.surfaceMaterialNearest!.setParameter(
+                    name: "texture",
+                    value: .textureResource(self.textureResource!)
+                )
+                try! self.surfaceMaterialBilinear!.setParameter(
+                    name: "texture",
+                    value: .textureResource(self.textureResource!)
+                )
+                try! self.surfaceMaterialBicubic!.setParameter(
+                    name: "texture",
+                    value: .textureResource(self.textureResource!)
+                )
+            }
+            self.lastEnableDrawableMipmaps = VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps
+            
+            let surfaceMaterialPicked = switch VRRClarityTestbenchApp.gStore.settings.imageFilteringMethod {
+                case "nearest": self.surfaceMaterialNearest
+                case "bilinear": self.surfaceMaterialBilinear
+                case "bicubic": self.surfaceMaterialBicubic
+                default: self.surfaceMaterialBilinear
+            }
+            
+            if let surfaceMaterialPicked = surfaceMaterialPicked {
+                plane.model?.materials = [surfaceMaterialPicked]
             }
             
             guard let commandBuffer = commandQueue.makeCommandBuffer() else {
@@ -407,18 +415,21 @@ class ImmersiveSystem : System {
                 return
             }
             
+            let virtualScreenWidth: Float = widthRatio * VRRClarityTestbenchApp.gStore.settings.virtualScreenDiagonal * inchesToMeters // 62cm, or 24.4in
+            let virtualScreenHeight: Float = heightRatio * VRRClarityTestbenchApp.gStore.settings.virtualScreenDiagonal * inchesToMeters // 34.9cm, or 13.7in
+            
             var scale = simd_float3(virtualScreenWidth, 1.0, virtualScreenHeight)
             if fullFOVRender {
                 scale = simd_float3(DummyMetalRenderer.renderTangents[0].x + DummyMetalRenderer.renderTangents[0].y, 1.0, DummyMetalRenderer.renderTangents[0].z + DummyMetalRenderer.renderTangents[0].w)
-                scale *= virtualScreenDepth
+                scale *= VRRClarityTestbenchApp.gStore.settings.virtualScreenDepth * inchesToMeters
             }
             
             var orientation = simd_quatf(transform) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
             var position = simd_float3(planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z)
-            if !headlockTestImage && !fullFOVRender {
+            if !VRRClarityTestbenchApp.gStore.settings.headlockTestImage && !fullFOVRender {
                 orientation = RemovePitchAndRoll(orientation) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
                 let forward = orientation.act(simd_float3(0.0, 1.0, 0.0))
-                position -= (forward * virtualScreenDepth)
+                position -= (forward * VRRClarityTestbenchApp.gStore.settings.virtualScreenDepth * inchesToMeters)
             }
             
             //print(String(format: "%.2f, %.2f, %.2f", planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z), CACurrentMediaTime() - lastUpdateTime)
@@ -524,21 +535,20 @@ class ImmersiveSystem : System {
     var lastLastSubmit = 0.0
     func drawNextTexture(commandBuffer: MTLCommandBuffer, drawable: MTLTexture, simdDeviceAnchor: simd_float4x4, plane: ModelEntity, position: simd_float3, orientation: simd_quatf, scale: simd_float3) {
         autoreleasepool {
-            for i in 0..<colorMipmapLevelStart {
-                if onlyColorsNoTestImage {
+            for i in 0..<Int(VRRClarityTestbenchApp.gStore.settings.colorMipmapLevelStart) {
+                if VRRClarityTestbenchApp.gStore.settings.onlyColorsNoTestImage {
                     fillMipLevel(commandBuffer, drawable, i)
                 }
                 else {
                     copyTextureToMipLevel(commandBuffer, drawable, testImageTexture, i)
                 }
-                if !enableDrawableMipmaps {
+                if !VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps {
                     break
                 }
             }
-            if enableDrawableMipmaps {
-                for i in colorMipmapLevelStart..<drawable.mipmapLevelCount {
-                    print("Mip level generating:", i)
-                    if colorMipLevels {
+            if VRRClarityTestbenchApp.gStore.settings.enableDrawableMipmaps {
+                for i in Int(VRRClarityTestbenchApp.gStore.settings.colorMipmapLevelStart)..<drawable.mipmapLevelCount {
+                    if VRRClarityTestbenchApp.gStore.settings.colorMipLevels {
                         fillMipLevel(commandBuffer, drawable, i)
                     }
                     else {
@@ -547,7 +557,7 @@ class ImmersiveSystem : System {
                 }
             }
             
-            if imageDoesntFollowHeadAtAll {
+            if VRRClarityTestbenchApp.gStore.settings.imageDoesntFollowHeadAtAll {
                 plane.position = simd_float3(0.0, 1.0, -1.0)
                 plane.orientation = simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
                 plane.scale = scale
