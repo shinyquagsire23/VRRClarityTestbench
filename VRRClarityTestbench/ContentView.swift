@@ -73,7 +73,7 @@ struct ContentView: View {
                         showImmersiveSpace = false
                     }
                     
-                    dismissWindow(id: "Entry")
+                    //dismissWindow(id: "Entry")
                     
                 } else if immersiveSpaceIsShown {
                     await dismissImmersiveSpace()

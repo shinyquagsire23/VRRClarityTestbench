@@ -73,6 +73,10 @@ let renderZNear = 0.001
 let renderZFar = 100.0
 let inchesToMeters: Float = 25.4 / 1000.0
 
+let forceDrawableQueue = false
+let renderViewCount = 1
+let useTripleBufferingStaleTextureVisionOS2Hack = true
+
 enum ImageFilteringMethod {
     case nearest
     case bilinear
@@ -177,10 +181,108 @@ class VisionPro: NSObject, ObservableObject {
     }
 }
 
+class DrawableWrapper {
+    var wrapped: AnyObject? = nil
+    var drawable: AnyObject? = nil
+    var textureResource: TextureResource? = nil
+    var texture: MTLTexture? = nil
+    
+    @MainActor init(pixelFormat: MTLPixelFormat, width: Int, height: Int, usage: MTLTextureUsage, mipmapLevelCount: Int) {
+        if #available(visionOS 2.0, *), !forceDrawableQueue {
+            let isBiplanar = false
+            if isBiplanar {
+                let desc = LowLevelTexture.Descriptor(textureType: .type2DArray, pixelFormat: pixelFormat, width: width, height: height/renderViewCount, depth: 1, mipmapLevelCount: mipmapLevelCount, arrayLength: renderViewCount, textureUsage: usage)
+                let tex = try? LowLevelTexture(descriptor: desc)
+                self.wrapped = tex
+            }
+            else {
+                let desc = LowLevelTexture.Descriptor(textureType: .type2D, pixelFormat: pixelFormat, width: width, height: height, depth: 1, mipmapLevelCount: mipmapLevelCount, arrayLength: 1, textureUsage: usage)
+                let tex = try? LowLevelTexture(descriptor: desc)
+                self.wrapped = tex
+            }
+            return
+        }
+
+        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: pixelFormat, width: width, height: height, usage: [usage], mipmapsMode: enableDrawableMipmaps ? .allocateAll : .none)
+        let queue = try? TextureResource.DrawableQueue(desc)
+        queue!.allowsNextDrawableTimeout = true
+        self.wrapped = queue
+    }
+    
+    func makeTextureResource() -> TextureResource? {
+        if #available(visionOS 2.0, *) {
+            if let tex = wrapped as? LowLevelTexture {
+                self.textureResource = try! TextureResource(from: tex)
+                return self.textureResource
+            }
+        }
+        
+        if let queue = wrapped as? TextureResource.DrawableQueue {
+            if self.textureResource == nil {
+                let data = Data([0x00, 0x00, 0x00, 0xFF])
+                self.textureResource = try! TextureResource(
+                    dimensions: .dimensions(width: 1, height: 1),
+                    format: .raw(pixelFormat: .bgra8Unorm),
+                    contents: .init(
+                        mipmapLevels: [
+                            .mip(data: data, bytesPerRow: 4),
+                        ]
+                    )
+                )
+            }
+            self.textureResource?.replace(withDrawables: queue)
+            
+            return self.textureResource
+        }
+        
+        return nil
+    }
+    
+    @MainActor func nextTexture(commandBuffer: MTLCommandBuffer) -> MTLTexture? {
+        if #available(visionOS 2.0, *) {
+            if let tex = wrapped as? LowLevelTexture {
+                if self.texture != nil {
+                    return self.texture
+                }
+                let writeTexture: MTLTexture = tex.replace(using: commandBuffer)
+                
+                // HACK: Ewwwwwwwww
+                if useTripleBufferingStaleTextureVisionOS2Hack {
+                    self.texture = writeTexture
+                }
+                return writeTexture
+            }
+        }
+        
+        if let queue = wrapped as? TextureResource.DrawableQueue {
+            let drawable = try? queue.nextDrawable()
+            self.drawable = drawable
+            return drawable?.texture
+        }
+        
+        return nil
+    }
+    
+    @MainActor func present(commandBuffer: MTLCommandBuffer) {
+        if #available(visionOS 2.0, *) {
+            if wrapped as? LowLevelTexture != nil {
+                commandBuffer.commit()
+                commandBuffer.waitUntilCompleted()
+                return
+            }
+        }
+        if let drawable = self.drawable as? TextureResource.Drawable {
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            drawable.presentOnSceneUpdate()
+        }
+    }
+}
+
 class ImmersiveSystem : System {
     let visionPro = VisionPro()
     var lastUpdateTime = 0.0
-    var drawableQueue: TextureResource.DrawableQueue? = nil
+    var drawableQueue: DrawableWrapper? = nil
     private(set) var surfaceMaterial: ShaderGraphMaterial? = nil
     private var textureResource: TextureResource?
     
@@ -201,9 +303,7 @@ class ImmersiveSystem : System {
         self.device = MTLCreateSystemDefaultDevice()!
         self.commandQueue = self.device.makeCommandQueue()!
         
-        let desc = TextureResource.DrawableQueue.Descriptor(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapsMode: enableDrawableMipmaps ? .allocateAll : .none)
-        self.drawableQueue = try? TextureResource.DrawableQueue(desc)
-        self.drawableQueue!.allowsNextDrawableTimeout = true
+        self.drawableQueue = DrawableWrapper(pixelFormat: renderFormat, width: currentRenderWidth, height: currentRenderHeight, usage: [.renderTarget, .shaderRead], mipmapLevelCount: 10)
         
         let textureLoader = MTKTextureLoader(device: device)
         testImageTexture = try! textureLoader.newTexture(URL: Bundle.main.url(forResource: testImageFilename, withExtension: "png")!, options: [.generateMipmaps: true])
@@ -223,7 +323,7 @@ class ImmersiveSystem : System {
             await visionPro.runArkitSession()
         }
         Task {
-            var materialName = switch imageFilteringMethod {
+            let materialName = switch imageFilteringMethod {
                 case .nearest:
                     "/Root/MonoMaterialNearest"
                 case .bilinear:
@@ -235,11 +335,11 @@ class ImmersiveSystem : System {
                 named: materialName,
                 from: "SBSMaterial.usda"
             )
+            self.textureResource = self.drawableQueue!.makeTextureResource()
             try! self.surfaceMaterial!.setParameter(
                 name: "texture",
                 value: .textureResource(self.textureResource!)
             )
-            textureResource!.replace(withDrawables: drawableQueue!)
         }
         
         if CVMetalTextureCacheCreate(nil, nil, self.device, nil, &textureCache) != 0 {
@@ -294,40 +394,39 @@ class ImmersiveSystem : System {
             
             //planeTransform.columns.3 += DummyMetalRenderer.renderViewTransforms[0].columns.3
             
-            do {
-                
-                let drawable = try drawableQueue?.nextDrawable()
-                if drawable == nil {
-                    return
-                }
-                
-                var scale = simd_float3(virtualScreenWidth, 1.0, virtualScreenHeight)
-                if fullFOVRender {
-                    scale = simd_float3(DummyMetalRenderer.renderTangents[0].x + DummyMetalRenderer.renderTangents[0].y, 1.0, DummyMetalRenderer.renderTangents[0].z + DummyMetalRenderer.renderTangents[0].w)
-                    scale *= virtualScreenDepth
-                }
-                
-                var orientation = simd_quatf(transform) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
-                var position = simd_float3(planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z)
-                if !headlockTestImage && !fullFOVRender {
-                    orientation = RemovePitchAndRoll(orientation) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
-                    let forward = orientation.act(simd_float3(0.0, 1.0, 0.0))
-                    position -= (forward * virtualScreenDepth)
-                }
-                
-                //print(String(format: "%.2f, %.2f, %.2f", planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z), CACurrentMediaTime() - lastUpdateTime)
-                lastUpdateTime = CACurrentMediaTime()
-                
-                if let surfaceMaterial = surfaceMaterial {
-                    plane.model?.materials = [surfaceMaterial]
-                }
-                
-                drawNextTexture(drawable: drawable!, simdDeviceAnchor: transform, plane: plane, position: position, orientation: orientation, scale: scale)
-                drawable!.presentOnSceneUpdate()
+            if let surfaceMaterial = surfaceMaterial {
+                plane.model?.materials = [surfaceMaterial]
             }
-            catch {
             
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
+                print("aaaaaaaaaa")
+                return
             }
+            let drawable = drawableQueue?.nextTexture(commandBuffer: commandBuffer)
+            if drawable == nil {
+                return
+            }
+            
+            var scale = simd_float3(virtualScreenWidth, 1.0, virtualScreenHeight)
+            if fullFOVRender {
+                scale = simd_float3(DummyMetalRenderer.renderTangents[0].x + DummyMetalRenderer.renderTangents[0].y, 1.0, DummyMetalRenderer.renderTangents[0].z + DummyMetalRenderer.renderTangents[0].w)
+                scale *= virtualScreenDepth
+            }
+            
+            var orientation = simd_quatf(transform) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
+            var position = simd_float3(planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z)
+            if !headlockTestImage && !fullFOVRender {
+                orientation = RemovePitchAndRoll(orientation) * simd_quatf(angle: 1.5708, axis: simd_float3(1,0,0))
+                let forward = orientation.act(simd_float3(0.0, 1.0, 0.0))
+                position -= (forward * virtualScreenDepth)
+            }
+            
+            //print(String(format: "%.2f, %.2f, %.2f", planeTransform.columns.3.x, planeTransform.columns.3.y, planeTransform.columns.3.z), CACurrentMediaTime() - lastUpdateTime)
+            lastUpdateTime = CACurrentMediaTime()
+            
+            drawNextTexture(commandBuffer: commandBuffer, drawable: drawable!, simdDeviceAnchor: transform, plane: plane, position: position, orientation: orientation, scale: scale)
+            drawableQueue?.present(commandBuffer: commandBuffer)
+            //drawable!.presentOnSceneUpdate()
         }
     }
     
@@ -423,31 +522,27 @@ class ImmersiveSystem : System {
     
     var lastSubmit = 0.0
     var lastLastSubmit = 0.0
-    func drawNextTexture(drawable: TextureResource.Drawable, simdDeviceAnchor: simd_float4x4, plane: ModelEntity, position: simd_float3, orientation: simd_quatf, scale: simd_float3) {
+    func drawNextTexture(commandBuffer: MTLCommandBuffer, drawable: MTLTexture, simdDeviceAnchor: simd_float4x4, plane: ModelEntity, position: simd_float3, orientation: simd_quatf, scale: simd_float3) {
         autoreleasepool {
-            guard let commandBuffer = commandQueue.makeCommandBuffer() else {
-                print("aaaaaaaaaa")
-                return
-            }
-            
             for i in 0..<colorMipmapLevelStart {
                 if onlyColorsNoTestImage {
-                    fillMipLevel(commandBuffer, drawable.texture, i)
+                    fillMipLevel(commandBuffer, drawable, i)
                 }
                 else {
-                    copyTextureToMipLevel(commandBuffer, drawable.texture, testImageTexture, i)
+                    copyTextureToMipLevel(commandBuffer, drawable, testImageTexture, i)
                 }
                 if !enableDrawableMipmaps {
                     break
                 }
             }
             if enableDrawableMipmaps {
-                for i in colorMipmapLevelStart..<drawable.texture.mipmapLevelCount {
+                for i in colorMipmapLevelStart..<drawable.mipmapLevelCount {
+                    print("Mip level generating:", i)
                     if colorMipLevels {
-                        fillMipLevel(commandBuffer, drawable.texture, i)
+                        fillMipLevel(commandBuffer, drawable, i)
                     }
                     else {
-                        copyTextureToMipLevel(commandBuffer, drawable.texture, testImageTexture, i)
+                        copyTextureToMipLevel(commandBuffer, drawable, testImageTexture, i)
                     }
                 }
             }
@@ -462,13 +557,6 @@ class ImmersiveSystem : System {
                 plane.orientation = orientation
                 plane.scale = scale
             }
-            
-            
-            
-            //commandBuffer.present(drawable)
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted() // this is a load-bearing wait
-            
         }
     }
 }
