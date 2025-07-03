@@ -18,7 +18,7 @@ import SceneKit
 let fullFOVRender = false
 
 // Render texture params
-let renderWidth = Int(fullFOVRender ? 1920+298 : 1920) // left/right eye are spaced 256px x 80px apart, so we adjust for that.
+let renderWidth = Int(fullFOVRender ? 1888+293 : 1920) // left/right eye are spaced 256px x 80px apart, so we adjust for that.
 let renderHeight = Int(fullFOVRender ? 1824+84 : 1080) // 1824 for full screen
 let renderScale = fullFOVRender ? 2.5 : 1.0
 
